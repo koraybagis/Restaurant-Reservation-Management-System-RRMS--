@@ -21,6 +21,8 @@ namespace RestoranRezervasyonSistemi
         public int SecilenMasaKapasite { get; set; }
         string dogrulamaKodu;
 
+        // 6. hafta kodları eklendi
+
         public RezervasyonDetay()
         {
             InitializeComponent();
