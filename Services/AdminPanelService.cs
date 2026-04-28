@@ -119,9 +119,27 @@ namespace RestoranRezervasyonSistemi.Services
 
         public Reservation GetSelectedReservation(DataGridView dgv, List<Reservation> reservations)
         {
-            var selectedRow = dgv.SelectedRows[0];
-            int reservationId = Convert.ToInt32(selectedRow.Cells["Id"].Value);
-            return reservations.FirstOrDefault(r => r.Id == reservationId);
+            try
+            {
+                if (dgv.SelectedRows.Count == 0)
+                {
+                    return null;
+                }
+
+                var selectedRow = dgv.SelectedRows[0];
+                
+                if (selectedRow.Cells["Id"]?.Value == null)
+                {
+                    return null;
+                }
+
+                int reservationId = Convert.ToInt32(selectedRow.Cells["Id"].Value);
+                return reservations.FirstOrDefault(r => r.Id == reservationId);
+            }
+            catch
+            {
+                return null;
+            }
         }
 
         public bool BanUser(User user)

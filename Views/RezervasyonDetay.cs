@@ -80,6 +80,13 @@ namespace RestoranRezervasyonSistemi.Views
             try
             {
                 var menuItems = _menuController.GetAllMenuItems();
+                
+                if (menuItems == null || menuItems.Count == 0)
+                {
+                    MessageBox.Show("Menü yüklenemedi veya menü bulunamadı.", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                    return;
+                }
+                
                 _menuItemsCache = menuItems.ToDictionary(m => m.Id);
 
                 lstYemekSecimi.Items.Clear();
@@ -148,7 +155,7 @@ namespace RestoranRezervasyonSistemi.Views
                     picYemekResmi.Image = null;
                 }
             }
-            catch (Exception ex)
+            catch
             {
                 // Resim yüklenemezse hata vermeden devam et
                 picYemekResmi.Image = null;

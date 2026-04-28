@@ -243,8 +243,20 @@ namespace RestoranRezervasyonSistemi.Views
 
         private void btnRezervasyonDetaylari_Click(object sender, EventArgs e)
         {
-            if (dgvRezervasyonlar.CurrentRow != null)
+            try
             {
+                if (_reservations == null || _reservations.Count == 0)
+                {
+                    DialogService.ShowError("Gösterilecek rezervasyon bulunmamaktadır.");
+                    return;
+                }
+
+                if (dgvRezervasyonlar.SelectedRows.Count == 0)
+                {
+                    DialogService.ShowError("Lütfen bir rezervasyon seçin.");
+                    return;
+                }
+
                 var selectedReservation = _adminService.GetSelectedReservation(dgvRezervasyonlar, _reservations);
                 if (selectedReservation != null)
                 {
@@ -252,12 +264,12 @@ namespace RestoranRezervasyonSistemi.Views
                 }
                 else
                 {
-                    DialogService.ShowError("Lütfen bir rezervasyon seçin.");
+                    DialogService.ShowError("Seçilen rezervasyon bulunamadı.");
                 }
             }
-            else
+            catch (Exception ex)
             {
-                DialogService.ShowError("Lütfen bir rezervasyon seçin.");
+                DialogService.ShowError($"Rezervasyon detayları gösterilirken hata oluştu: {ex.Message}");
             }
         }
 
