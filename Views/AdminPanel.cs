@@ -38,64 +38,91 @@ namespace RestoranRezervasyonSistemi.Views
 
         private void LoadTables()
         {
-            var tables = _adminService.LoadTables();
-            dgvMasalar.DataSource = null;
-            dgvMasalar.DataSource = tables;
-
-            var tableHeaders = new Dictionary<string, string>
+            try
             {
-                { "Id", "No" },
-                { "TableName", "Masa Adı" },
-                { "Capacity", "Kapasite" },
-                { "Location", "Konum" }
-            };
-            _adminService.SetDataGridViewColumnHeaders(dgvMasalar, tableHeaders);
+                var tables = _adminService.LoadTables();
+                dgvMasalar.DataSource = null;
+                dgvMasalar.DataSource = tables;
+
+                var tableHeaders = new Dictionary<string, string>
+                {
+                    { "Id", "No" },
+                    { "TableName", "Masa Adı" },
+                    { "Capacity", "Kapasite" },
+                    { "Location", "Konum" }
+                };
+                _adminService.SetDataGridViewColumnHeaders(dgvMasalar, tableHeaders);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Masalar yüklenirken hata: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadUsers()
         {
-            _users = _adminService.LoadUsers();
-            dgvUsers.DataSource = null;
-            dgvUsers.DataSource = _users;
-
-            var userHeaders = new Dictionary<string, string>
+            try
             {
-                { "Id", "ID" },
-                { "Username", "Kullanıcı Adı" },
-                { "FullName", "Tam Ad" },
-                { "Email", "E-posta" },
-                { "Phone", "Telefon" },
-                { "Role", "Rol" },
-                { "IsBanned", "Durum" }
-            };
-            _adminService.SetDataGridViewColumnHeaders(dgvUsers, userHeaders);
-            _adminService.StyleUserDataGridView(dgvUsers);
+                _users = _adminService.LoadUsers();
+                dgvUsers.DataSource = null;
+                dgvUsers.DataSource = _users;
+
+                var userHeaders = new Dictionary<string, string>
+                {
+                    { "Id", "ID" },
+                    { "Username", "Kullanıcı Adı" },
+                    { "FullName", "Tam Ad" },
+                    { "Email", "E-posta" },
+                    { "Phone", "Telefon" },
+                    { "Role", "Rol" },
+                    { "IsBanned", "Durum" }
+                };
+                _adminService.SetDataGridViewColumnHeaders(dgvUsers, userHeaders);
+                _adminService.StyleUserDataGridView(dgvUsers);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Kullanıcılar yüklenirken hata: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void LoadReservations()
         {
-            _reservations = _adminService.LoadReservations();
-            dgvRezervasyonlar.DataSource = null;
-            dgvRezervasyonlar.DataSource = _reservations;
-
-            var reservationHeaders = new Dictionary<string, string>
+            try
             {
-                { "Id", "ID" },
-                { "CustomerName", "Müşteri Adı" },
-                { "CustomerPhone", "Telefon" },
-                { "CustomerEmail", "E-posta" },
-                { "ReservationDate", "Tarih" },
-                { "ReservationTime", "Saat" },
-                { "TableId", "Masa ID" },
-                { "GuestCount", "Kişi Sayısı" }
-            };
-            _adminService.SetDataGridViewColumnHeaders(dgvRezervasyonlar, reservationHeaders);
+                _reservations = _adminService.LoadReservations();
+                dgvRezervasyonlar.DataSource = null;
+                dgvRezervasyonlar.DataSource = _reservations;
+
+                var reservationHeaders = new Dictionary<string, string>
+                {
+                    { "Id", "ID" },
+                    { "CustomerName", "Müşteri Adı" },
+                    { "CustomerPhone", "Telefon" },
+                    { "CustomerEmail", "E-posta" },
+                    { "ReservationDate", "Tarih" },
+                    { "ReservationTime", "Saat" },
+                    { "TableId", "Masa ID" },
+                    { "GuestCount", "Kişi Sayısı" }
+                };
+                _adminService.SetDataGridViewColumnHeaders(dgvRezervasyonlar, reservationHeaders);
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show("Rezervasyonlar yüklenirken hata: " + ex.Message, "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         // MASAYÖNETİM BUTONLARI
         private void btnEkle_Click(object sender, EventArgs e)
         {
-            if (_adminService.AddTable(txtMasaAdi.Text, int.Parse(txtKapasite.Text), txtKonum.Text))
+            if (string.IsNullOrWhiteSpace(txtMasaAdi.Text) || !int.TryParse(txtKapasite.Text, out int kapasite))
+            {
+                MessageBox.Show("Lütfen geçerli masa adı ve kapasite girin.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+            
+            if (_adminService.AddTable(txtMasaAdi.Text, kapasite, txtKonum.Text))
             {
                 LoadTables();
                 ClearTableFields();
@@ -106,7 +133,14 @@ namespace RestoranRezervasyonSistemi.Views
         {
             if (dgvMasalar.CurrentRow != null)
             {
-                int id = Convert.ToInt32(dgvMasalar.CurrentRow.Cells["Id"].Value);
+                var idValue = dgvMasalar.CurrentRow.Cells["Id"].Value;
+                if (idValue == null || idValue == DBNull.Value)
+                {
+                    MessageBox.Show("Masa ID bulunamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
+                int id = Convert.ToInt32(idValue);
                 if (_adminService.DeleteTable(id))
                 {
                     LoadTables();
@@ -119,8 +153,21 @@ namespace RestoranRezervasyonSistemi.Views
         {
             if (dgvMasalar.CurrentRow != null)
             {
-                int id = Convert.ToInt32(dgvMasalar.CurrentRow.Cells["Id"].Value);
-                if (_adminService.UpdateTable(id, txtMasaAdi.Text, int.Parse(txtKapasite.Text), txtKonum.Text))
+                var idValue = dgvMasalar.CurrentRow.Cells["Id"].Value;
+                if (idValue == null || idValue == DBNull.Value)
+                {
+                    MessageBox.Show("Masa ID bulunamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+                
+                if (string.IsNullOrWhiteSpace(txtMasaAdi.Text) || !int.TryParse(txtKapasite.Text, out int kapasite))
+                {
+                    MessageBox.Show("Lütfen geçerli masa adı ve kapasite girin.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+                
+                int id = Convert.ToInt32(idValue);
+                if (_adminService.UpdateTable(id, txtMasaAdi.Text, kapasite, txtKonum.Text))
                 {
                     LoadTables();
                     ClearTableFields();

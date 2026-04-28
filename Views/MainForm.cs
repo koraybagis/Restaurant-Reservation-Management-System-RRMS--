@@ -1,9 +1,10 @@
 ﻿using System;
+using System.Collections.Generic;
+using System.Data.SqlClient;
 using System.Drawing;
 using System.Windows.Forms;
 using RestoranRezervasyonSistemi.Controllers;
 using RestoranRezervasyonSistemi.Models;
-using RestoranRezervasyonSistemi.Data;
 using RestoranRezervasyonSistemi.Services;
 
 namespace RestoranRezervasyonSistemi.Views
@@ -14,15 +15,11 @@ namespace RestoranRezervasyonSistemi.Views
         public User CurrentUser { get; set; }
 
         private readonly TableController _tableController;
-        private readonly ReservationController _reservationController;
-        private readonly TableService _tableService;
         private readonly ToolTip _toolTip;
 
         public MainForm()
         {
             _tableController = new TableController();
-            _reservationController = new ReservationController();
-            _tableService = new TableService(_tableController, _reservationController);
             _toolTip = CreateToolTip();
             InitializeComponent();
         }
@@ -40,24 +37,81 @@ namespace RestoranRezervasyonSistemi.Views
 
         private void MainForm_Load(object sender, EventArgs e)
         {
-            LoadTables();
-            SetupUserManagementButton();
+            try
+            {
+                LoadTables();
+                SetupUserManagementButton();
+                SetupPersonelGirisButton();
+            }
+            catch (Exception ex)
+            {
+                MessageBox.Show($"Ana form yüklenirken hata: {ex.Message}\n\nHata Detayı: {ex.StackTrace}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
         }
 
         private void SetupUserManagementButton()
         {
-            if (CurrentUser?.Role != "Admin")
+            var isAdmin = string.Equals(UserRoleService.Normalize(CurrentUser?.Role), Models.UserRole.Admin, StringComparison.OrdinalIgnoreCase);
+            if (!isAdmin)
             {
                 btnUserManagement.Visible = false;
                 return;
             }
 
-            btnUserManagement.Click += (s, ev) => {
-                using (var userManagement = new UserManagementForm())
+            btnUserManagement.Visible = true;
+            btnUserManagement.Click -= BtnUserManagement_Click;
+            btnUserManagement.Click += BtnUserManagement_Click;
+        }
+
+        private void BtnUserManagement_Click(object sender, EventArgs e)
+        {
+            using (var userManagement = new UserManagementForm())
+            {
+                userManagement.ShowDialog();
+            }
+        }
+
+        private void SetupPersonelGirisButton()
+        {
+            btnPersonelGiris.Click -= BtnPersonelGiris_Click;
+            btnPersonelGiris.Click += BtnPersonelGiris_Click;
+        }
+
+        private void BtnPersonelGiris_Click(object sender, EventArgs e)
+        {
+            using (var personelLoginForm = new PersonelLoginForm())
+            {
+                if (personelLoginForm.ShowDialog() == DialogResult.OK)
                 {
-                    userManagement.ShowDialog();
+                    var loggedInUser = personelLoginForm.LoggedInUser;
+                    
+                    if (loggedInUser == null)
+                    {
+                        MessageBox.Show("Giriş başarısız. Kullanıcı bilgisi alınamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                        return;
+                    }
+
+                    var normalizedRole = UserRoleService.Normalize(loggedInUser.Role);
+                    if (string.Equals(normalizedRole, Models.UserRole.Waiter, StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var personelPanel = new PersonelPanel(loggedInUser))
+                        {
+                            personelPanel.ShowDialog();
+                        }
+                    }
+                    else if (string.Equals(normalizedRole, Models.UserRole.Cleaner, StringComparison.OrdinalIgnoreCase))
+                    {
+                        using (var temizlikPanel = new TemizlikPanel(loggedInUser))
+                        {
+                            temizlikPanel.ShowDialog();
+                        }
+                    }
+                    else
+                    {
+                        MessageBox.Show("Bu kullanıcı için yetki tanımlanmamış.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    }
                 }
-            };
+            }
         }
 
         public void LoadTables()
@@ -66,7 +120,23 @@ namespace RestoranRezervasyonSistemi.Views
             {
                 flpMasalar.Controls.Clear();
 
-                var tableButtonInfos = _tableService.GetTableButtonInfos();
+                var tables = _tableController.GetAllTables();
+                
+                if (tables == null || tables.Count == 0)
+                {
+                    MessageBox.Show("Veritabanında masa bulunamadı. Geçici olarak dummy masalar gösteriliyor.\n\nLütfen Admin Panelinden masalar ekleyin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    tables = CreateFallbackTables();
+                }
+
+                var tableButtonInfos = new List<TableButtonInfo>();
+
+                foreach (var table in tables)
+                {
+                    var buttonColor = GetTableButtonColor(table);
+                    var tooltipText = GetTableTooltipText(table);
+                    
+                    tableButtonInfos.Add(new TableButtonInfo(table, buttonColor, tooltipText));
+                }
 
                 foreach (var tableInfo in tableButtonInfos)
                 {
@@ -76,14 +146,45 @@ namespace RestoranRezervasyonSistemi.Views
 
                 flpMasalar.Refresh();
             }
+            catch (SqlException ex)
+            {
+                MessageBox.Show($"Veritabanı hatası (masa yüklenirken): {ex.Message}\n\nSQL Hata Kodu: {ex.Number}\n\nDummy masalar gösteriliyor.", "Veritabanı Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadFallbackTables();
+            }
             catch (NullReferenceException ex)
             {
-                MessageBox.Show($"Null reference hatası (masa yüklenirken): {ex.Message}\n\nVeritabanı bağlantısını kontrol edin.", "Null Reference Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Null reference hatası (masa yüklenirken): {ex.Message}\n\nDummy masalar gösteriliyor.", "Null Reference Hatası", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadFallbackTables();
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Masalar yüklenirken hata oluştu: {ex.Message}\n\nStack Trace: {ex.StackTrace}", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                MessageBox.Show($"Masalar yüklenirken hata oluştu: {ex.Message}\n\nDummy masalar gösteriliyor.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                LoadFallbackTables();
             }
+        }
+
+        private void LoadFallbackTables()
+        {
+            flpMasalar.Controls.Clear();
+            foreach (var table in CreateFallbackTables())
+            {
+                var buttonColor = GetTableButtonColor(table);
+                var tooltipText = GetTableTooltipText(table);
+                var tableInfo = new TableButtonInfo(table, buttonColor, tooltipText);
+                var button = CreateTableButton(tableInfo);
+                flpMasalar.Controls.Add(button);
+            }
+        }
+
+        private static List<Table> CreateFallbackTables()
+        {
+            return new List<Table>
+            {
+                new Table { Id = 1, TableName = "Masa 1", Capacity = 4, Location = "Bahçe", Status = TableStatus.Available },
+                new Table { Id = 2, TableName = "Masa 2", Capacity = 4, Location = "Bahçe", Status = TableStatus.Available },
+                new Table { Id = 3, TableName = "Masa 3", Capacity = 6, Location = "İç Mekan", Status = TableStatus.Available },
+                new Table { Id = 4, TableName = "Masa 4", Capacity = 6, Location = "İç Mekan", Status = TableStatus.Available }
+            };
         }
 
         private Button CreateTableButton(TableButtonInfo tableInfo)
@@ -112,6 +213,17 @@ namespace RestoranRezervasyonSistemi.Views
             return $"{table.TableName}\n{table.Location}\n({table.Capacity} Kişilik)";
         }
 
+        private Color GetTableButtonColor(Table table)
+        {
+            var normalizedStatus = TableStatusService.Normalize(table?.Status);
+            return TableStatusService.GetColor(normalizedStatus);
+        }
+
+        private string GetTableTooltipText(Table table)
+        {
+            return $"{table.TableName}\nKonum: {table.Location}\nKapasite: {table.Capacity}\nDurum: {table.Status}";
+        }
+
         private void HandleTableClick(Table table)
         {
             try
@@ -126,6 +238,12 @@ namespace RestoranRezervasyonSistemi.Views
                 if (string.IsNullOrEmpty(this.AktifKullaniciMail))
                 {
                     MessageBox.Show("Kullanıcı mail adresi bulunamadı. Lütfen tekrar giriş yapın.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
+
+                if (this.CurrentUser == null)
+                {
+                    MessageBox.Show("Kullanıcı bilgisi bulunamadı. Lütfen tekrar giriş yapın.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 

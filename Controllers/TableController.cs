@@ -15,36 +15,83 @@ namespace RestoranRezervasyonSistemi.Controllers
         {
             var tables = new List<Table>();
 
-            using (var conn = _db.GetConnection())
+            try
             {
-                if (conn.State == ConnectionState.Closed) conn.Open();
-
-                // NOTE: Some DBs use MasaDurumlari as a view; keep as-is to avoid breaking existing DB.
-                const string sql = "SELECT id, table_name, capacity, location, Status, reservation_time FROM MasaDurumlari";
-
-                using (var cmd = new SqlCommand(sql, conn))
-                using (var dr = cmd.ExecuteReader())
+                using (var conn = _db.GetConnection())
                 {
-                    while (dr.Read())
+                    if (conn.State == ConnectionState.Closed) conn.Open();
+
+                    const string sql = "SELECT * FROM tables";
+                    using (var cmd = new SqlCommand(sql, conn))
+                    using (var dr = cmd.ExecuteReader())
                     {
-                        var table = new Table
+                        var schema = dr.GetSchemaTable();
+                        bool hasId = HasColumn(schema, "id");
+                        bool hasTableName = HasColumn(schema, "table_name");
+                        bool hasCapacity = HasColumn(schema, "capacity");
+                        bool hasLocation = HasColumn(schema, "location");
+                        bool hasStatus = HasColumn(schema, "status");
+                        bool hasReservationTime = HasColumn(schema, "reservation_time");
+
+                        while (dr.Read())
                         {
-                            Id = dr["id"] != DBNull.Value ? Convert.ToInt32(dr["id"]) : 0,
-                            TableName = dr["table_name"]?.ToString() ?? "İsimsiz",
-                            Capacity = dr["capacity"] != DBNull.Value ? Convert.ToInt32(dr["capacity"]) : 0,
-                            Location = dr["location"]?.ToString() ?? "",
-                            Status = dr["status"] != DBNull.Value ? dr["status"].ToString().Trim() : "Bos",
-                        };
+                            var table = new Table
+                            {
+                                Id = hasId && dr["id"] != DBNull.Value ? Convert.ToInt32(dr["id"]) : 0,
+                                TableName = hasTableName ? dr["table_name"]?.ToString() ?? "İsimsiz" : "İsimsiz",
+                                Capacity = hasCapacity && dr["capacity"] != DBNull.Value ? Convert.ToInt32(dr["capacity"]) : 0,
+                                Location = hasLocation ? dr["location"]?.ToString() ?? string.Empty : string.Empty,
+                                Status = hasStatus && dr["status"] != DBNull.Value ? dr["status"].ToString().Trim() : TableStatus.Available,
+                            };
 
-                        if (dr["reservation_time"] != DBNull.Value)
-                            table.ReservationTime = (TimeSpan)dr["reservation_time"];
+                            if (hasReservationTime && dr["reservation_time"] != DBNull.Value)
+                            {
+                                table.ReservationTime = dr["reservation_time"] is TimeSpan ts
+                                    ? ts
+                                    : TimeSpan.TryParse(dr["reservation_time"].ToString(), out var parsedTime)
+                                        ? parsedTime
+                                        : (TimeSpan?)null;
+                            }
 
-                        tables.Add(table);
+                            tables.Add(table);
+                        }
                     }
                 }
             }
+            catch (SqlException ex)
+            {
+                throw new Exception($"Masalar yüklenirken veritabanı hatası. SQL Hata Kodu: {ex.Number}. Hata: {ex.Message}", ex);
+            }
+            catch (Exception ex)
+            {
+                throw new Exception($"Masalar yüklenirken hata oluştu: {ex.Message}", ex);
+            }
 
             return tables;
+        }
+
+        public bool UpdateTableStatus(int tableId, string status)
+        {
+            try
+            {
+                using (var conn = _db.GetConnection())
+                {
+                    conn.Open();
+                    const string sql = "UPDATE Tables SET Status = @Status WHERE Id = @Id";
+                    
+                    using (var cmd = new SqlCommand(sql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Status", status);
+                        cmd.Parameters.AddWithValue("@Id", tableId);
+                        
+                        return cmd.ExecuteNonQuery() > 0;
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                throw new Exception("Masa durumu güncellenemedi: " + ex.Message);
+            }
         }
 
         public bool AddTable(Table t)
@@ -60,12 +107,15 @@ namespace RestoranRezervasyonSistemi.Controllers
                         cmd.Parameters.AddWithValue("@name", t.TableName);
                         cmd.Parameters.AddWithValue("@cap", t.Capacity);
                         cmd.Parameters.AddWithValue("@loc", t.Location);
-                        cmd.Parameters.AddWithValue("@status", string.IsNullOrEmpty(t.Status) ? "Bos" : t.Status);
+                        cmd.Parameters.AddWithValue("@status", string.IsNullOrWhiteSpace(t.Status) ? TableStatus.Available : t.Status);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }
             }
-            catch (Exception) { return false; }
+            catch (Exception ex)
+            {
+                throw new Exception("Masa ekleme işlemi başarısız oldu.", ex);
+            }
         }
 
         public bool DeleteTable(int id)
@@ -83,7 +133,10 @@ namespace RestoranRezervasyonSistemi.Controllers
                     }
                 }
             }
-            catch (Exception) { return false; }
+            catch (Exception ex)
+            {
+                throw new Exception("Masa silme işlemi başarısız oldu.", ex);
+            }
         }
 
         public bool UpdateTable(Table t)
@@ -99,13 +152,30 @@ namespace RestoranRezervasyonSistemi.Controllers
                         cmd.Parameters.AddWithValue("@name", t.TableName);
                         cmd.Parameters.AddWithValue("@cap", t.Capacity);
                         cmd.Parameters.AddWithValue("@loc", t.Location);
-                        cmd.Parameters.AddWithValue("@status", t.Status);
+                        cmd.Parameters.AddWithValue("@status", string.IsNullOrWhiteSpace(t.Status) ? TableStatus.Available : t.Status);
                         cmd.Parameters.AddWithValue("@id", t.Id);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }
             }
-            catch (Exception) { return false; }
+            catch (Exception ex)
+            {
+                throw new Exception("Masa güncelleme işlemi başarısız oldu.", ex);
+            }
+        }
+
+        private static bool HasColumn(DataTable schemaTable, string columnName)
+        {
+            if (schemaTable == null || string.IsNullOrWhiteSpace(columnName))
+                return false;
+
+            foreach (DataRow row in schemaTable.Rows)
+            {
+                if (string.Equals(row["ColumnName"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
         }
     }
 }

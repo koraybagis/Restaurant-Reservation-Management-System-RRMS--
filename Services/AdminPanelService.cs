@@ -92,7 +92,7 @@ namespace RestoranRezervasyonSistemi.Services
 
         public bool ValidateUserSelection(DataGridView dgv)
         {
-            if (dgv.SelectedRows.Count == 0)
+            if (dgv.SelectedRows.Count == 0 && dgv.CurrentRow == null)
             {
                 DialogService.ShowWarning("Lütfen bir kullanıcı seçin.");
                 return false;
@@ -102,7 +102,7 @@ namespace RestoranRezervasyonSistemi.Services
 
         public bool ValidateReservationSelection(DataGridView dgv)
         {
-            if (dgv.SelectedRows.Count == 0)
+            if (dgv.SelectedRows.Count == 0 && dgv.CurrentRow == null)
             {
                 DialogService.ShowWarning("Lütfen bir rezervasyon seçin.");
                 return false;
@@ -112,7 +112,10 @@ namespace RestoranRezervasyonSistemi.Services
 
         public User GetSelectedUser(DataGridView dgv, List<User> users)
         {
-            var selectedRow = dgv.SelectedRows[0];
+            var selectedRow = dgv.SelectedRows.Count > 0 ? dgv.SelectedRows[0] : dgv.CurrentRow;
+            if (selectedRow == null)
+                return null;
+
             int userId = Convert.ToInt32(selectedRow.Cells["Id"].Value);
             return users.FirstOrDefault(u => u.Id == userId);
         }
@@ -121,12 +124,12 @@ namespace RestoranRezervasyonSistemi.Services
         {
             try
             {
-                if (dgv.SelectedRows.Count == 0)
+                if (dgv.SelectedRows.Count == 0 && dgv.CurrentRow == null)
                 {
                     return null;
                 }
 
-                var selectedRow = dgv.SelectedRows[0];
+                var selectedRow = dgv.SelectedRows.Count > 0 ? dgv.SelectedRows[0] : dgv.CurrentRow;
                 
                 if (selectedRow.Cells["Id"]?.Value == null)
                 {
@@ -136,8 +139,9 @@ namespace RestoranRezervasyonSistemi.Services
                 int reservationId = Convert.ToInt32(selectedRow.Cells["Id"].Value);
                 return reservations.FirstOrDefault(r => r.Id == reservationId);
             }
-            catch
+            catch (Exception ex)
             {
+                DialogService.ShowError($"Rezervasyon seçimi okunamadı: {ex.Message}");
                 return null;
             }
         }
@@ -146,6 +150,12 @@ namespace RestoranRezervasyonSistemi.Services
         {
             try
             {
+                if (user == null)
+                {
+                    DialogService.ShowWarning("Geçerli bir kullanıcı seçin.");
+                    return false;
+                }
+
                 if (DialogService.ShowConfirmation($"{user.FullName} kullanıcısını banlamak istediğinizden emin misiniz?", "Ban Onayı"))
                 {
                     if (_userController.BanUser(user.Id, user.FullName))
@@ -170,6 +180,12 @@ namespace RestoranRezervasyonSistemi.Services
         {
             try
             {
+                if (user == null)
+                {
+                    DialogService.ShowWarning("Geçerli bir kullanıcı seçin.");
+                    return false;
+                }
+
                 if (DialogService.ShowConfirmation($"{user.FullName} kullanıcısının banını kaldırmak istediğinizden emin misiniz?", "Ban Kaldırma Onayı"))
                 {
                     if (_userController.UnbanUser(user.Id, user.FullName))
@@ -194,26 +210,22 @@ namespace RestoranRezervasyonSistemi.Services
         {
             try
             {
+                if (reservation == null)
+                {
+                    DialogService.ShowWarning("Geçerli bir rezervasyon seçin.");
+                    return false;
+                }
+
                 if (DialogService.ShowConfirmation($"{reservation.CustomerName} kullanıcısının rezervasyonunu iptal etmek istediğinizden emin misiniz?\n\nRezervasyona ait menü ürünleri de silinecektir.", "Rezervasyon İptal Onayı"))
                 {
-                    // Önce menü ürünlerini sil
-                    var menuController = new MenuController();
-                    if (menuController.DeleteReservationMenuItems(reservation.Id))
+                    if (_reservationController.CancelByIdWithMenuItems(reservation.Id))
                     {
-                        // Sonra rezervasyonu sil
-                        if (_reservationController.CancelById(reservation.Id))
-                        {
-                            DialogService.ShowInfo("Rezervasyon ve menü ürünleri başarıyla iptal edildi.");
-                            return true;
-                        }
-                        else
-                        {
-                            DialogService.ShowError("Rezervasyon iptal işlemi başarısız oldu.");
-                        }
+                        DialogService.ShowInfo("Rezervasyon ve menü ürünleri başarıyla iptal edildi.");
+                        return true;
                     }
                     else
                     {
-                        DialogService.ShowError("Menü ürünleri silme işlemi başarısız oldu.");
+                        DialogService.ShowError("Rezervasyon iptal işlemi başarısız oldu.");
                     }
                 }
             }

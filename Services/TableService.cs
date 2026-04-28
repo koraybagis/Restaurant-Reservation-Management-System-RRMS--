@@ -32,18 +32,23 @@ namespace RestoranRezervasyonSistemi.Services
             var currentTime = DateTime.Now.TimeOfDay;
             var today = DateTime.Today;
 
-            return tables.Select(table => new TableButtonInfo
-            {
-                Table = table,
-                ButtonColor = GetTableColor(table, currentTime),
-                TooltipText = GetTooltipText(table, today, currentTime)
-            }).ToList();
+            return tables.Select(table => new TableButtonInfo(
+                table,
+                GetTableColor(table, currentTime),
+                GetTooltipText(table, today, currentTime)
+            )).ToList();
         }
 
         private Color GetTableColor(Table table, TimeSpan currentTime)
         {
+            var normalizedStatus = TableStatusService.Normalize(table.Status);
+            var baseColor = TableStatusService.GetColor(normalizedStatus);
+
+            if (normalizedStatus == TableStatus.Dirty || normalizedStatus == TableStatus.Occupied)
+                return baseColor;
+
             if (table.ReservationTime == null)
-                return Color.ForestGreen;
+                return baseColor;
 
             var reservationTime = (TimeSpan)table.ReservationTime;
             var warningTime = reservationTime.Add(TimeSpan.FromMinutes(-TableConstants.WarningMinutesBeforeReservation));
@@ -51,7 +56,7 @@ namespace RestoranRezervasyonSistemi.Services
 
             return currentTime >= warningTime && currentTime <= endTime 
                 ? Color.Firebrick 
-                : Color.ForestGreen;
+                : baseColor;
         }
 
         private string GetTooltipText(Table table, DateTime today, TimeSpan currentTime)
@@ -67,12 +72,5 @@ namespace RestoranRezervasyonSistemi.Services
                    $"En erken uygun saat: {earliestText}\n" +
                    $"Oturma süresi: {(TableConstants.ReservationDurationMinutes / 60)} saat";
         }
-    }
-
-    public class TableButtonInfo
-    {
-        public Table Table { get; set; }
-        public Color ButtonColor { get; set; }
-        public string TooltipText { get; set; }
     }
 }

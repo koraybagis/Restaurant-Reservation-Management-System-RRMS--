@@ -292,6 +292,8 @@ namespace RestoranRezervasyonSistemi.Views
             this.dgvUsers.Name = "dgvUsers";
             this.dgvUsers.RowHeadersWidth = 51;
             this.dgvUsers.RowTemplate.Height = 24;
+            this.dgvUsers.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dgvUsers.MultiSelect = false;
             this.dgvUsers.Size = new System.Drawing.Size(950, 350);
             this.dgvUsers.TabIndex = 11;
             this.dgvUsers.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgvUsers_CellClick);
@@ -354,6 +356,8 @@ namespace RestoranRezervasyonSistemi.Views
             this.dgvRezervasyonlar.Name = "dgvRezervasyonlar";
             this.dgvRezervasyonlar.RowHeadersWidth = 51;
             this.dgvRezervasyonlar.RowTemplate.Height = 24;
+            this.dgvRezervasyonlar.SelectionMode = System.Windows.Forms.DataGridViewSelectionMode.FullRowSelect;
+            this.dgvRezervasyonlar.MultiSelect = false;
             this.dgvRezervasyonlar.Size = new System.Drawing.Size(950, 350);
             this.dgvRezervasyonlar.TabIndex = 16;
             this.dgvRezervasyonlar.CellClick += new System.Windows.Forms.DataGridViewCellEventHandler(this.dgvRezervasyonlar_CellClick);

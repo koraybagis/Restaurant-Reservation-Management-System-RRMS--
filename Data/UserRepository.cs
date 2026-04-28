@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Data.SqlClient;
 using RestoranRezervasyonSistemi.Models;
 
@@ -83,7 +84,10 @@ namespace RestoranRezervasyonSistemi.Data
             using (var conn = _db.GetConnection())
             {
                 conn.Open();
-                const string sql = "SELECT id, username, email, full_name, phone, role, IsBanned FROM users ORDER BY full_name";
+                var hasIsBanned = HasIsBannedColumn(conn);
+                var sql = hasIsBanned
+                    ? "SELECT id, username, email, full_name, phone, role, IsBanned FROM users ORDER BY full_name"
+                    : "SELECT id, username, email, full_name, phone, role, CAST(0 AS bit) AS IsBanned FROM users ORDER BY full_name";
                 
                 using (var cmd = new SqlCommand(sql, conn))
                 {
@@ -138,6 +142,75 @@ namespace RestoranRezervasyonSistemi.Data
                     int affected = cmd.ExecuteNonQuery();
                     return affected > 0;
                 }
+            }
+        }
+
+        public User AuthenticateUser(string userOrFullName, string password)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                var hasIsBanned = HasIsBannedColumn(conn);
+                var sql = hasIsBanned
+                    ? "SELECT id, username, role, email, full_name, phone, IsBanned FROM users WHERE (username=@u OR full_name=@u) AND password=@p"
+                    : "SELECT id, username, role, email, full_name, phone, CAST(0 AS bit) AS IsBanned FROM users WHERE (username=@u OR full_name=@u) AND password=@p";
+
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@u", userOrFullName.Trim());
+                    cmd.Parameters.AddWithValue("@p", password);
+
+                    using (var dr = cmd.ExecuteReader())
+                    {
+                        var schema = dr.GetSchemaTable();
+                        bool hasIsBannedField = HasColumn(schema, "IsBanned");
+
+                        if (!dr.Read())
+                            return null;
+
+                        bool isBanned = hasIsBannedField
+                            && dr["IsBanned"] != DBNull.Value
+                            && Convert.ToBoolean(dr["IsBanned"]);
+
+                        if (isBanned)
+                            return null;
+
+                        return new User
+                        {
+                            Id = Convert.ToInt32(dr["id"]),
+                            Username = dr["username"]?.ToString()?.Trim(),
+                            Role = dr["role"]?.ToString()?.Trim(),
+                            Email = dr["email"]?.ToString()?.Trim(),
+                            FullName = dr["full_name"]?.ToString()?.Trim(),
+                            Phone = dr["phone"]?.ToString()?.Trim(),
+                            IsBanned = isBanned
+                        };
+                    }
+                }
+            }
+        }
+
+        private static bool HasColumn(DataTable schemaTable, string columnName)
+        {
+            if (schemaTable == null || string.IsNullOrWhiteSpace(columnName))
+                return false;
+
+            foreach (DataRow row in schemaTable.Rows)
+            {
+                if (string.Equals(row["ColumnName"]?.ToString(), columnName, StringComparison.OrdinalIgnoreCase))
+                    return true;
+            }
+
+            return false;
+        }
+
+        private static bool HasIsBannedColumn(SqlConnection conn)
+        {
+            const string sql = "SELECT COL_LENGTH('users', 'IsBanned')";
+            using (var cmd = new SqlCommand(sql, conn))
+            {
+                var value = cmd.ExecuteScalar();
+                return value != null && value != DBNull.Value;
             }
         }
     }

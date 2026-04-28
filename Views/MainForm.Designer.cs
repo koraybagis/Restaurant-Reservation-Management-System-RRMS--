@@ -30,6 +30,7 @@
         {
             this.components = new System.ComponentModel.Container();
             this.panel1 = new System.Windows.Forms.Panel();
+            this.btnPersonelGiris = new System.Windows.Forms.Button();
             this.btnSettings = new System.Windows.Forms.Button();
             this.btnUserManagement = new System.Windows.Forms.Button();
             this.btnTables = new System.Windows.Forms.Button();
@@ -46,6 +47,7 @@
             // panel1
             // 
             this.panel1.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(28)))), ((int)(((byte)(40)))), ((int)(((byte)(51)))));
+            this.panel1.Controls.Add(this.btnPersonelGiris);
             this.panel1.Controls.Add(this.btnSettings);
             this.panel1.Controls.Add(this.btnUserManagement);
             this.panel1.Controls.Add(this.btnTables);
@@ -57,6 +59,23 @@
             this.panel1.Size = new System.Drawing.Size(250, 450);
             this.panel1.TabIndex = 0;
             this.panel1.Paint += new System.Windows.Forms.PaintEventHandler(this.panel1_Paint);
+            // 
+            // btnPersonelGiris
+            // 
+            this.btnPersonelGiris.BackColor = System.Drawing.Color.FromArgb(((int)(((byte)(46)))), ((int)(((byte)(204)))), ((int)(((byte)(113)))));
+            this.btnPersonelGiris.Cursor = System.Windows.Forms.Cursors.Hand;
+            this.btnPersonelGiris.Dock = System.Windows.Forms.DockStyle.Top;
+            this.btnPersonelGiris.FlatAppearance.BorderSize = 0;
+            this.btnPersonelGiris.FlatStyle = System.Windows.Forms.FlatStyle.Flat;
+            this.btnPersonelGiris.Font = new System.Drawing.Font("Segoe UI", 10.8F, System.Drawing.FontStyle.Bold, System.Drawing.GraphicsUnit.Point, ((byte)(162)));
+            this.btnPersonelGiris.ForeColor = System.Drawing.Color.White;
+            this.btnPersonelGiris.Location = new System.Drawing.Point(0, 270);
+            this.btnPersonelGiris.Name = "btnPersonelGiris";
+            this.btnPersonelGiris.Size = new System.Drawing.Size(250, 60);
+            this.btnPersonelGiris.TabIndex = 5;
+            this.btnPersonelGiris.Text = "    👤 Personel Girişi";
+            this.btnPersonelGiris.TextAlign = System.Drawing.ContentAlignment.MiddleLeft;
+            this.btnPersonelGiris.UseVisualStyleBackColor = false;
             // 
             // btnSettings
             // 
@@ -198,6 +217,7 @@
         #endregion
 
         private System.Windows.Forms.Panel panel1;
+        private System.Windows.Forms.Button btnPersonelGiris;
         private System.Windows.Forms.Button btnSettings;
         private System.Windows.Forms.Button btnUserManagement;
         private System.Windows.Forms.Button btnTables;

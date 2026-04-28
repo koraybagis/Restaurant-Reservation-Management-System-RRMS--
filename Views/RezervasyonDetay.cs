@@ -5,14 +5,11 @@ using System.Data;
 using System.Drawing;
 using System.IO;
 using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
 using System.Windows.Forms;
-using System.Net.Mail;
-using System.Net;
 using RestoranRezervasyonSistemi.Controllers;
-using RestoranRezervasyonSistemi.Services;
+using RestoranRezervasyonSistemi.Data;
 using RestoranRezervasyonSistemi.Models;
+using RestoranRezervasyonSistemi.Services;
 
 namespace RestoranRezervasyonSistemi.Views
 {
@@ -32,17 +29,20 @@ namespace RestoranRezervasyonSistemi.Views
 
         // 9. hafta kodları eklendi - Menü ve yemek seçimi
         private readonly MenuController _menuController = new MenuController();
-        private Dictionary<int, Models.MenuItem> _menuItemsCache;
+        private readonly ReservationWorkflowService _reservationWorkflowService;
+        private Dictionary<int, RestoranRezervasyonSistemi.Models.MenuItem> _menuItemsCache;
         private Dictionary<int, int> _yemekAdetleri = new Dictionary<int, int>(); // MenuItemId, Adet
 
         public RezervasyonDetay()
         {
             InitializeComponent();
+            _reservationWorkflowService = new ReservationWorkflowService(_reservationController, _menuController);
         }
 
         public RezervasyonDetay(int reservationId)
         {
             InitializeComponent();
+            _reservationWorkflowService = new ReservationWorkflowService(_reservationController, _menuController);
             _currentUserReservationId = reservationId;
         }
 
@@ -215,7 +215,8 @@ namespace RestoranRezervasyonSistemi.Views
                     return;
                 }
 
-                var r = _reservationController.GetNextReservationForUser(SecilenMasaId, dtpTarih.Value.Date, customerEmail, customerName);
+                var selectedTime = dtpSaat.Value.TimeOfDay;
+                var r = _reservationWorkflowService.FindUserReservation(SecilenMasaId, dtpTarih.Value.Date, customerEmail, customerName, selectedTime);
                 if (r == null)
                 {
                     btnIptalEt.Enabled = false;
@@ -251,10 +252,13 @@ namespace RestoranRezervasyonSistemi.Views
                 return;
             }
 
-            if (string.IsNullOrEmpty(GirisYapanAdminMail)) GirisYapanAdminMail = "merttemizcanbir@gmail.com";
+            if (string.IsNullOrWhiteSpace(GirisYapanAdminMail))
+            {
+                MessageBox.Show("Doğrulama e-postası bulunamadı. Lütfen yeniden giriş yapın.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                return;
+            }
 
-            Random rnd = new Random();
-            dogrulamaKodu = rnd.Next(100000, 999999).ToString();
+            dogrulamaKodu = _reservationWorkflowService.CreateVerificationCode();
 
             try
             {
@@ -276,7 +280,7 @@ namespace RestoranRezervasyonSistemi.Views
         {
             try
             {
-                int reservationId = _reservationController.CreateReservation(
+                int reservationId = _reservationWorkflowService.CreateReservation(
                     tableId: SecilenMasaId,
                     customerName: txtMusteriAd.Text,
                     customerPhone: txtMusteriTel.Text,
@@ -313,10 +317,7 @@ namespace RestoranRezervasyonSistemi.Views
                     }
                 }
 
-                if (selectedItems.Any())
-                {
-                    _menuController.AddReservationMenuItems(reservationId, selectedItems);
-                }
+                _reservationWorkflowService.SaveSelectedMenuItems(reservationId, selectedItems);
             }
             catch (Exception ex)
             {

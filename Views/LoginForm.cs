@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Windows.Forms;
 using RestoranRezervasyonSistemi.Controllers;
+using RestoranRezervasyonSistemi.Services;
 
 namespace RestoranRezervasyonSistemi.Views
 {
@@ -29,11 +30,16 @@ namespace RestoranRezervasyonSistemi.Views
                     return;
                 }
 
-                if (string.Equals(currentUser.Role, "Admin", StringComparison.OrdinalIgnoreCase))
+                var normalizedRole = UserRoleService.Normalize(currentUser.Role);
+                if (string.Equals(normalizedRole, Models.UserRole.Admin, StringComparison.OrdinalIgnoreCase))
                 {
                     MessageBox.Show("Admin Paneline Hoş Geldiniz!");
-                    var adminPanel = new AdminPanel();
-                    adminPanel.Show();
+                    using (var adminPanel = new AdminPanel())
+                    {
+                        Hide();
+                        adminPanel.ShowDialog();
+                    }
+                    Close();
                 }
                 else
                 {
@@ -44,9 +50,8 @@ namespace RestoranRezervasyonSistemi.Views
                         CurrentUser = currentUser
                     };
                     main.Show();
+                    Hide();
                 }
-
-                Hide();
             }
             catch (Exception ex)
             {

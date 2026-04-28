@@ -4,15 +4,15 @@ using System.Drawing;
 using System.IO;
 using System.Linq;
 using System.Windows.Forms;
+using RestoranRezervasyonSistemi.Models;
 using RestoranRezervasyonSistemi.Controllers;
-using MenuItemModel = RestoranRezervasyonSistemi.Models.MenuItem;
 
 namespace RestoranRezervasyonSistemi.Views
 {
     public partial class MenuYonetimForm : Form
     {
         private readonly MenuController _menuController = new MenuController();
-        private List<MenuItemModel> _menuItems;
+        private List<RestoranRezervasyonSistemi.Models.MenuItem> _menuItems;
 
         public MenuYonetimForm()
         {
@@ -20,11 +20,27 @@ namespace RestoranRezervasyonSistemi.Views
             LoadMenuItems();
         }
 
+        public MenuYonetimForm(RestoranRezervasyonSistemi.Models.MenuItem menuItem)
+        {
+            InitializeComponent();
+            LoadMenuItems();
+            // Seçili menü öğesini formda göster
+            if (menuItem != null)
+            {
+                var index = _menuItems.FindIndex(item => item.Id == menuItem.Id);
+                if (index >= 0)
+                {
+                    lstMenu.SelectedIndex = index;
+                }
+            }
+        }
+
         private void LoadMenuItems()
         {
             try
             {
-                _menuItems = _menuController.GetAllMenuItemsIncludingUnavailable();
+                var menuItems = _menuController.GetAllMenuItemsIncludingUnavailable();
+                _menuItems = menuItems;
                 lstMenu.Items.Clear();
 
                 foreach (var item in _menuItems)
@@ -60,7 +76,7 @@ namespace RestoranRezervasyonSistemi.Views
                     CreatedDate = DateTime.Now
                 };
 
-                _menuController.AddMenuItem(menuItem);
+                _menuController.AddMenuItem(menuItem.ToMenuItem());
                 MessageBox.Show("Yemek başarıyla eklendi!", "Bilgi", MessageBoxButtons.OK, MessageBoxIcon.Information);
                 ClearForm();
                 LoadMenuItems();
@@ -145,7 +161,7 @@ namespace RestoranRezervasyonSistemi.Views
                 chkMevcut.Checked = selectedItem.IsAvailable;
                 
                 // Seçilen yemeğin detaylarını göster
-                LoadMenuItemDetails(selectedItem);
+                LoadMenuItemDetails(new MenuItemModel(selectedItem));
             }
         }
 
@@ -184,13 +200,8 @@ namespace RestoranRezervasyonSistemi.Views
                     return;
                 }
 
-                // Debug için yolları göster
                 string basePath = AppDomain.CurrentDomain.BaseDirectory;
                 string fullPath = Path.Combine(basePath, imagePath);
-                
-                // Debug bilgilerini detay label'ında göster
-                lblYemekDetay.ForeColor = System.Drawing.Color.White;
-                lblYemekDetay.Text = $"Resim yolu:\n{imagePath}\nTam yol:\n{fullPath}\nMevcut: {File.Exists(fullPath)}";
                 
                 if (File.Exists(fullPath))
                 {
@@ -198,17 +209,11 @@ namespace RestoranRezervasyonSistemi.Views
                 }
                 else
                 {
-                    // Resim bulunamadığında hata mesajı göster
-                    lblYemekDetay.ForeColor = System.Drawing.Color.Red;
-                    lblYemekDetay.Text = $"Resim bulunamadı:\n{imagePath}\nTam yol:\n{fullPath}\nBulunamadı!";
                     picYemekResmi.Image = null;
                 }
             }
-            catch (Exception ex)
+            catch (Exception)
             {
-                // Resim yüklenirken hata göster
-                lblYemekDetay.ForeColor = System.Drawing.Color.Red;
-                lblYemekDetay.Text = $"Resim yüklenemedi:\n{ex.Message}\nYol: {imagePath}";
                 picYemekResmi.Image = null;
             }
         }

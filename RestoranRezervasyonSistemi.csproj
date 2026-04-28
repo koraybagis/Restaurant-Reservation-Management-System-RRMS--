@@ -114,10 +114,13 @@
     <Compile Include="Views\IslemOnay.Designer.cs">
       <DependentUpon>IslemOnay.cs</DependentUpon>
     </Compile>
+    <Compile Include="Models\Enums.cs" />
     <Compile Include="Models\MenuItem.cs" />
+    <Compile Include="Models\MenuItemModel.cs" />
     <Compile Include="Models\ReservationMenuItem.cs" />
     <Compile Include="Models\Reservation.cs" />
     <Compile Include="Models\Table.cs" />
+    <Compile Include="Models\TableButtonInfo.cs" />
     <Compile Include="Models\User.cs" />
     <Compile Include="Views\LoginForm.cs">
       <SubType>Form</SubType>
@@ -181,10 +184,32 @@
     <Compile Include="Views\AdetGirisiForm.Designer.cs">
       <DependentUpon>AdetGirisiForm.cs</DependentUpon>
     </Compile>
+    <Compile Include="Views\PersonelLoginForm.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Views\PersonelLoginForm.Designer.cs">
+      <DependentUpon>PersonelLoginForm.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\PersonelPanel.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Views\PersonelPanel.Designer.cs">
+      <DependentUpon>PersonelPanel.cs</DependentUpon>
+    </Compile>
+    <Compile Include="Views\TemizlikPanel.cs">
+      <SubType>Form</SubType>
+    </Compile>
+    <Compile Include="Views\TemizlikPanel.Designer.cs">
+      <DependentUpon>TemizlikPanel.cs</DependentUpon>
+    </Compile>
     <Compile Include="Services\SmtpEmailService.cs" />
     <Compile Include="Services\DialogService.cs" />
     <Compile Include="Services\TableService.cs" />
     <Compile Include="Services\AdminPanelService.cs" />
+    <Compile Include="Services\TableStatusService.cs" />
+    <Compile Include="Services\TableOrderService.cs" />
+    <Compile Include="Services\ReservationWorkflowService.cs" />
+    <Compile Include="Services\UserRoleService.cs" />
     <EmbeddedResource Include="Views\ForgotPasswordForm.resx">
       <DependentUpon>ForgotPasswordForm.cs</DependentUpon>
     </EmbeddedResource>
@@ -226,6 +251,15 @@
     </EmbeddedResource>
     <EmbeddedResource Include="Views\AdminPanel.resx">
       <DependentUpon>AdminPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\PersonelLoginForm.resx">
+      <DependentUpon>PersonelLoginForm.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\PersonelPanel.resx">
+      <DependentUpon>PersonelPanel.cs</DependentUpon>
+    </EmbeddedResource>
+    <EmbeddedResource Include="Views\TemizlikPanel.resx">
+      <DependentUpon>TemizlikPanel.cs</DependentUpon>
     </EmbeddedResource>
     <None Include="packages.config" />
     <None Include="Properties\Settings.settings">

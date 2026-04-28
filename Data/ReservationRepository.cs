@@ -92,7 +92,7 @@ namespace RestoranRezervasyonSistemi.Data
             }
         }
 
-        public (int ReservationId, TimeSpan ReservationTime)? GetNextReservationForUser(int tableId, DateTime date, string customerEmail, string customerName)
+        public (int ReservationId, TimeSpan ReservationTime)? GetNextReservationForUser(int tableId, DateTime date, string customerEmail, string customerName, TimeSpan? fromTime = null)
         {
             using (var conn = _db.GetConnection())
             {
@@ -100,6 +100,7 @@ namespace RestoranRezervasyonSistemi.Data
                 const string sql = @"SELECT TOP 1 id, reservation_time
                                      FROM reservations
                                      WHERE table_id=@tid AND reservation_date=@date AND customer_email=@mail AND customer_name=@name
+                                       AND (@fromTime IS NULL OR reservation_time >= @fromTime)
                                      ORDER BY reservation_time";
 
                 using (var cmd = new SqlCommand(sql, conn))
@@ -108,6 +109,7 @@ namespace RestoranRezervasyonSistemi.Data
                     cmd.Parameters.AddWithValue("@date", date.Date);
                     cmd.Parameters.AddWithValue("@mail", customerEmail);
                     cmd.Parameters.AddWithValue("@name", customerName);
+                    cmd.Parameters.AddWithValue("@fromTime", fromTime.HasValue ? (object)fromTime.Value : DBNull.Value);
 
                     using (var dr = cmd.ExecuteReader())
                     {
@@ -266,6 +268,105 @@ namespace RestoranRezervasyonSistemi.Data
             }
             
             return reservations;
+        }
+
+        public int EnsureOpenReservationForTable(int tableId)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                using (var tx = conn.BeginTransaction(IsolationLevel.Serializable))
+                {
+                    const string selectSql = @"SELECT TOP 1 id
+                                           FROM reservations
+                                           WHERE table_id = @tid AND reservation_date = @date
+                                           ORDER BY reservation_time DESC, id DESC";
+
+                    using (var selectCmd = new SqlCommand(selectSql, conn, tx))
+                    {
+                        selectCmd.Parameters.AddWithValue("@tid", tableId);
+                        selectCmd.Parameters.AddWithValue("@date", DateTime.Today);
+                        var existingId = selectCmd.ExecuteScalar();
+                        if (existingId != null && existingId != DBNull.Value)
+                        {
+                            tx.Commit();
+                            return Convert.ToInt32(existingId);
+                        }
+                    }
+
+                    const string insertSql = @"INSERT INTO reservations (table_id, customer_name, customer_phone, reservation_date, guest_count, reservation_time, customer_email)
+                                           VALUES (@tid, @name, @phone, @date, @count, @time, @mail);
+                                           SELECT CAST(SCOPE_IDENTITY() as int)";
+
+                    using (var insertCmd = new SqlCommand(insertSql, conn, tx))
+                    {
+                        insertCmd.Parameters.AddWithValue("@tid", tableId);
+                        insertCmd.Parameters.AddWithValue("@name", $"Masa {tableId} Adisyon");
+                        insertCmd.Parameters.AddWithValue("@phone", "-");
+                        insertCmd.Parameters.AddWithValue("@date", DateTime.Today);
+                        insertCmd.Parameters.AddWithValue("@count", 1);
+                        insertCmd.Parameters.AddWithValue("@time", DateTime.Now.TimeOfDay);
+                        insertCmd.Parameters.AddWithValue("@mail", "walkin@local");
+                        var newId = Convert.ToInt32(insertCmd.ExecuteScalar());
+                        tx.Commit();
+                        return newId;
+                    }
+                }
+            }
+        }
+
+        public int? GetOpenReservationForTable(int tableId)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                const string sql = @"SELECT TOP 1 id
+                                     FROM reservations
+                                     WHERE table_id = @tid
+                                     ORDER BY reservation_date DESC, reservation_time DESC, id DESC";
+
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@tid", tableId);
+                    var id = cmd.ExecuteScalar();
+                    if (id == null || id == DBNull.Value)
+                        return null;
+
+                    return Convert.ToInt32(id);
+                }
+            }
+        }
+
+        public bool CancelReservationWithMenuItems(int reservationId)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                using (var tx = conn.BeginTransaction(IsolationLevel.ReadCommitted))
+                {
+                    const string deleteMenuSql = "DELETE FROM ReservationMenuItems WHERE ReservationId = @resId";
+                    using (var menuCmd = new SqlCommand(deleteMenuSql, conn, tx))
+                    {
+                        menuCmd.Parameters.AddWithValue("@resId", reservationId);
+                        menuCmd.ExecuteNonQuery();
+                    }
+
+                    const string deleteReservationSql = "DELETE FROM reservations WHERE id = @id";
+                    using (var reservationCmd = new SqlCommand(deleteReservationSql, conn, tx))
+                    {
+                        reservationCmd.Parameters.AddWithValue("@id", reservationId);
+                        var affected = reservationCmd.ExecuteNonQuery();
+                        if (affected <= 0)
+                        {
+                            tx.Rollback();
+                            return false;
+                        }
+                    }
+
+                    tx.Commit();
+                    return true;
+                }
+            }
         }
     }
 }

@@ -10,9 +10,9 @@ namespace RestoranRezervasyonSistemi.Data
     {
         private readonly DbConnection _db = new DbConnection();
 
-        public List<MenuItem> GetAllMenuItems()
+        public List<RestoranRezervasyonSistemi.Models.MenuItem> GetAllMenuItems()
         {
-            var items = new List<MenuItem>();
+            var items = new List<RestoranRezervasyonSistemi.Models.MenuItem>();
 
             using (var conn = _db.GetConnection())
             {
@@ -28,17 +28,7 @@ namespace RestoranRezervasyonSistemi.Data
                     {
                         while (dr.Read())
                         {
-                            items.Add(new MenuItem
-                            {
-                                Id = Convert.ToInt32(dr["Id"]),
-                                Name = dr["Name"]?.ToString(),
-                                Description = dr["Description"]?.ToString(),
-                                Price = Convert.ToDecimal(dr["Price"]),
-                                ImagePath = dr["ImagePath"]?.ToString(),
-                                Category = dr["Category"]?.ToString(),
-                                IsAvailable = Convert.ToBoolean(dr["IsAvailable"]),
-                                CreatedDate = Convert.ToDateTime(dr["CreatedDate"])
-                            });
+                            items.Add(MapMenuItem(dr));
                         }
                     }
                 }
@@ -47,9 +37,9 @@ namespace RestoranRezervasyonSistemi.Data
             return items;
         }
 
-        public List<MenuItem> GetAllMenuItemsIncludingUnavailable()
+        public List<RestoranRezervasyonSistemi.Models.MenuItem> GetAllMenuItemsIncludingUnavailable()
         {
-            var items = new List<MenuItem>();
+            var items = new List<RestoranRezervasyonSistemi.Models.MenuItem>();
 
             using (var conn = _db.GetConnection())
             {
@@ -64,17 +54,7 @@ namespace RestoranRezervasyonSistemi.Data
                     {
                         while (dr.Read())
                         {
-                            items.Add(new MenuItem
-                            {
-                                Id = Convert.ToInt32(dr["Id"]),
-                                Name = dr["Name"]?.ToString(),
-                                Description = dr["Description"]?.ToString(),
-                                Price = Convert.ToDecimal(dr["Price"]),
-                                ImagePath = dr["ImagePath"]?.ToString(),
-                                Category = dr["Category"]?.ToString(),
-                                IsAvailable = Convert.ToBoolean(dr["IsAvailable"]),
-                                CreatedDate = Convert.ToDateTime(dr["CreatedDate"])
-                            });
+                            items.Add(MapMenuItem(dr));
                         }
                     }
                 }
@@ -83,9 +63,9 @@ namespace RestoranRezervasyonSistemi.Data
             return items;
         }
 
-        public List<MenuItem> GetMenuItemsByCategory(string category)
+        public List<RestoranRezervasyonSistemi.Models.MenuItem> GetMenuItemsByCategory(string category)
         {
-            var items = new List<MenuItem>();
+            var items = new List<RestoranRezervasyonSistemi.Models.MenuItem>();
             
             using (var conn = _db.GetConnection())
             {
@@ -103,17 +83,7 @@ namespace RestoranRezervasyonSistemi.Data
                     {
                         while (dr.Read())
                         {
-                            items.Add(new MenuItem
-                            {
-                                Id = Convert.ToInt32(dr["Id"]),
-                                Name = dr["Name"]?.ToString(),
-                                Description = dr["Description"]?.ToString(),
-                                Price = Convert.ToDecimal(dr["Price"]),
-                                ImagePath = dr["ImagePath"]?.ToString(),
-                                Category = dr["Category"]?.ToString(),
-                                IsAvailable = Convert.ToBoolean(dr["IsAvailable"]),
-                                CreatedDate = Convert.ToDateTime(dr["CreatedDate"])
-                            });
+                            items.Add(MapMenuItem(dr));
                         }
                     }
                 }
@@ -122,7 +92,7 @@ namespace RestoranRezervasyonSistemi.Data
             return items;
         }
 
-        public MenuItem GetMenuItemById(int id)
+        public RestoranRezervasyonSistemi.Models.MenuItem GetMenuItemById(int id)
         {
             using (var conn = _db.GetConnection())
             {
@@ -139,17 +109,7 @@ namespace RestoranRezervasyonSistemi.Data
                     {
                         if (dr.Read())
                         {
-                            return new MenuItem
-                            {
-                                Id = Convert.ToInt32(dr["Id"]),
-                                Name = dr["Name"]?.ToString(),
-                                Description = dr["Description"]?.ToString(),
-                                Price = Convert.ToDecimal(dr["Price"]),
-                                ImagePath = dr["ImagePath"]?.ToString(),
-                                Category = dr["Category"]?.ToString(),
-                                IsAvailable = Convert.ToBoolean(dr["IsAvailable"]),
-                                CreatedDate = Convert.ToDateTime(dr["CreatedDate"])
-                            };
+                            return MapMenuItem(dr);
                         }
                     }
                 }
@@ -185,7 +145,7 @@ namespace RestoranRezervasyonSistemi.Data
             return categories;
         }
 
-        public void AddMenuItem(MenuItem item)
+        public void AddMenuItem(RestoranRezervasyonSistemi.Models.MenuItem item)
         {
             using (var conn = _db.GetConnection())
             {
@@ -208,7 +168,7 @@ namespace RestoranRezervasyonSistemi.Data
             }
         }
 
-        public void UpdateMenuItem(MenuItem item)
+        public void UpdateMenuItem(RestoranRezervasyonSistemi.Models.MenuItem item)
         {
             using (var conn = _db.GetConnection())
             {
@@ -336,6 +296,110 @@ namespace RestoranRezervasyonSistemi.Data
                     return cmd.ExecuteNonQuery() > 0;
                 }
             }
+        }
+
+        public void AddOrUpdateReservationMenuItem(int reservationId, int menuItemId, int quantity, decimal unitPrice)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                const string sql = @"
+IF EXISTS (SELECT 1 FROM ReservationMenuItems WHERE ReservationId = @resId AND MenuItemId = @menuId)
+BEGIN
+    UPDATE ReservationMenuItems
+    SET Quantity = Quantity + @qty,
+        UnitPrice = @unitPrice,
+        TotalPrice = (Quantity + @qty) * @unitPrice
+    WHERE ReservationId = @resId AND MenuItemId = @menuId
+END
+ELSE
+BEGIN
+    INSERT INTO ReservationMenuItems (ReservationId, MenuItemId, Quantity, UnitPrice, TotalPrice)
+    VALUES (@resId, @menuId, @qty, @unitPrice, @qty * @unitPrice)
+END";
+
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@resId", reservationId);
+                    cmd.Parameters.AddWithValue("@menuId", menuItemId);
+                    cmd.Parameters.AddWithValue("@qty", quantity);
+                    cmd.Parameters.AddWithValue("@unitPrice", unitPrice);
+                    cmd.ExecuteNonQuery();
+                }
+            }
+        }
+
+        public bool RemoveOneReservationMenuItem(int reservationId, int menuItemId)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                const string sql = @"
+IF EXISTS (SELECT 1 FROM ReservationMenuItems WHERE ReservationId = @resId AND MenuItemId = @menuId AND Quantity > 1)
+BEGIN
+    UPDATE ReservationMenuItems
+    SET Quantity = Quantity - 1,
+        TotalPrice = (Quantity - 1) * UnitPrice
+    WHERE ReservationId = @resId AND MenuItemId = @menuId
+END
+ELSE
+BEGIN
+    DELETE FROM ReservationMenuItems
+    WHERE ReservationId = @resId AND MenuItemId = @menuId
+END";
+
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@resId", reservationId);
+                    cmd.Parameters.AddWithValue("@menuId", menuItemId);
+                    return cmd.ExecuteNonQuery() > 0;
+                }
+            }
+        }
+
+        public DataTable GetTableAdisyon(int tableId, DateTime date)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                const string sql = @"
+SELECT mi.Name AS UrunAdi,
+       rmi.Quantity AS Adet,
+       rmi.UnitPrice AS BirimFiyat,
+       rmi.TotalPrice AS Tutar
+FROM ReservationMenuItems rmi
+INNER JOIN MenuItems mi ON mi.Id = rmi.MenuItemId
+WHERE rmi.ReservationId = (
+    SELECT TOP 1 r.id
+    FROM reservations r
+    WHERE r.table_id = @tableId
+    ORDER BY r.reservation_date DESC, r.reservation_time DESC, r.id DESC
+)
+ORDER BY mi.Name";
+
+                using (var da = new SqlDataAdapter(sql, conn))
+                {
+                    da.SelectCommand.Parameters.AddWithValue("@tableId", tableId);
+                    var dt = new DataTable();
+                    da.Fill(dt);
+                    return dt;
+                }
+            }
+        }
+
+        private static RestoranRezervasyonSistemi.Models.MenuItem MapMenuItem(SqlDataReader dr)
+        {
+            return new RestoranRezervasyonSistemi.Models.MenuItem
+            {
+                Id = Convert.ToInt32(dr["Id"]),
+                Name = dr["Name"]?.ToString(),
+                Description = dr["Description"]?.ToString(),
+                Price = Convert.ToDecimal(dr["Price"]),
+                ImagePath = dr["ImagePath"]?.ToString(),
+                Category = dr["Category"]?.ToString(),
+                IsAvailable = Convert.ToBoolean(dr["IsAvailable"]),
+                CreatedDate = Convert.ToDateTime(dr["CreatedDate"])
+            };
         }
     }
 }

@@ -2,6 +2,7 @@ using RestoranRezervasyonSistemi.Data;
 using RestoranRezervasyonSistemi.Models;
 using System;
 using System.Collections.Generic;
+using System.Data;
 using System.Linq;
 
 namespace RestoranRezervasyonSistemi.Controllers
@@ -10,19 +11,19 @@ namespace RestoranRezervasyonSistemi.Controllers
     {
         private readonly MenuRepository _menuRepository = new MenuRepository();
 
-        public List<MenuItem> GetAllMenuItems() => _menuRepository.GetAllMenuItems();
+        public List<RestoranRezervasyonSistemi.Models.MenuItem> GetAllMenuItems() => _menuRepository.GetAllMenuItems();
 
-        public List<MenuItem> GetAllMenuItemsIncludingUnavailable() => _menuRepository.GetAllMenuItemsIncludingUnavailable();
+        public List<RestoranRezervasyonSistemi.Models.MenuItem> GetAllMenuItemsIncludingUnavailable() => _menuRepository.GetAllMenuItemsIncludingUnavailable();
 
-        public List<MenuItem> GetMenuItemsByCategory(string category) => _menuRepository.GetMenuItemsByCategory(category);
+        public List<RestoranRezervasyonSistemi.Models.MenuItem> GetMenuItemsByCategory(string category) => _menuRepository.GetMenuItemsByCategory(category);
 
-        public MenuItem GetMenuItemById(int id) => _menuRepository.GetMenuItemById(id);
+        public RestoranRezervasyonSistemi.Models.MenuItem GetMenuItemById(int id) => _menuRepository.GetMenuItemById(id);
 
         public List<string> GetCategories() => _menuRepository.GetCategories();
 
-        public void AddMenuItem(MenuItem item) => _menuRepository.AddMenuItem(item);
+        public void AddMenuItem(RestoranRezervasyonSistemi.Models.MenuItem item) => _menuRepository.AddMenuItem(item);
 
-        public void UpdateMenuItem(MenuItem item) => _menuRepository.UpdateMenuItem(item);
+        public void UpdateMenuItem(RestoranRezervasyonSistemi.Models.MenuItem item) => _menuRepository.UpdateMenuItem(item);
 
         public bool DeleteMenuItem(int id) => _menuRepository.DeleteMenuItem(id);
 
@@ -54,9 +55,9 @@ namespace RestoranRezervasyonSistemi.Controllers
             }
         }
 
-        public Dictionary<string, List<MenuItem>> GetMenuItemsByCategories()
+        public Dictionary<string, List<RestoranRezervasyonSistemi.Models.MenuItem>> GetMenuItemsByCategories()
         {
-            var result = new Dictionary<string, List<MenuItem>>();
+            var result = new Dictionary<string, List<RestoranRezervasyonSistemi.Models.MenuItem>>();
             var categories = GetCategories();
             
             foreach (var category in categories)
@@ -65,6 +66,25 @@ namespace RestoranRezervasyonSistemi.Controllers
             }
             
             return result;
+        }
+
+        public void AddItemToTableOrder(int reservationId, int menuItemId, int quantity = 1)
+        {
+            var menuItem = GetMenuItemById(menuItemId);
+            if (menuItem == null)
+                throw new InvalidOperationException("Seçilen ürün bulunamadı.");
+
+            _menuRepository.AddOrUpdateReservationMenuItem(reservationId, menuItemId, quantity, menuItem.Price);
+        }
+
+        public bool RemoveItemFromTableOrder(int reservationId, int menuItemId)
+        {
+            return _menuRepository.RemoveOneReservationMenuItem(reservationId, menuItemId);
+        }
+
+        public DataTable GetTableAdisyon(int tableId, DateTime date)
+        {
+            return _menuRepository.GetTableAdisyon(tableId, date);
         }
     }
 }
