@@ -77,13 +77,29 @@ namespace RestoranRezervasyonSistemi.Controllers
                 using (var conn = _db.GetConnection())
                 {
                     conn.Open();
-                    const string sql = "UPDATE Tables SET Status = @Status WHERE Id = @Id";
-                    
-                    using (var cmd = new SqlCommand(sql, conn))
+
+                    // Primary schema used across this project: tables(id, status)
+                    const string primarySql = "UPDATE tables SET status = @Status WHERE id = @Id";
+                    using (var cmd = new SqlCommand(primarySql, conn))
                     {
                         cmd.Parameters.AddWithValue("@Status", status);
                         cmd.Parameters.AddWithValue("@Id", tableId);
-                        
+
+                        return cmd.ExecuteNonQuery() > 0;
+                    }
+                }
+            }
+            catch (SqlException ex) when (ex.Number == 207 || ex.Number == 208)
+            {
+                // Compatibility fallback for environments with case-sensitive or different naming.
+                using (var conn = _db.GetConnection())
+                {
+                    conn.Open();
+                    const string fallbackSql = "UPDATE Tables SET Status = @Status WHERE Id = @Id";
+                    using (var cmd = new SqlCommand(fallbackSql, conn))
+                    {
+                        cmd.Parameters.AddWithValue("@Status", status);
+                        cmd.Parameters.AddWithValue("@Id", tableId);
                         return cmd.ExecuteNonQuery() > 0;
                     }
                 }

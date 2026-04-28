@@ -12,6 +12,7 @@ namespace RestoranRezervasyonSistemi.Views
     public partial class TemizlikPanel : Form
     {
         private readonly TableController _tableController;
+        private readonly ReservationController _reservationController;
         private readonly User _currentUser;
         private List<Table> _tables;
 
@@ -19,6 +20,7 @@ namespace RestoranRezervasyonSistemi.Views
         {
             InitializeComponent();
             _tableController = new TableController();
+            _reservationController = new ReservationController();
             _currentUser = user;
         }
 
@@ -56,7 +58,7 @@ namespace RestoranRezervasyonSistemi.Views
                 foreach (DataGridViewRow row in dgvMasalar.Rows)
                 {
                     var table = (Table)row.DataBoundItem;
-                    var normalizedStatus = TableStatusService.Normalize(table.Status);
+                    var normalizedStatus = GetEffectiveTableStatus(table);
                     row.DefaultCellStyle.BackColor = TableStatusService.GetColor(normalizedStatus);
                 }
             }
@@ -76,7 +78,7 @@ namespace RestoranRezervasyonSistemi.Views
 
             var selectedTable = (Table)dgvMasalar.SelectedRows[0].DataBoundItem;
             
-            if (TableStatusService.Normalize(selectedTable.Status) != TableStatus.Dirty)
+            if (GetEffectiveTableStatus(selectedTable) != TableStatus.Dirty)
             {
                 MessageBox.Show("Sadece kirli masalar temizlenebilir!", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                 return;
@@ -112,6 +114,26 @@ namespace RestoranRezervasyonSistemi.Views
         private void btnCikis_Click(object sender, EventArgs e)
         {
             this.Close();
+        }
+
+        private string GetEffectiveTableStatus(Table table)
+        {
+            var normalizedStatus = TableStatusService.Normalize(table?.Status);
+            if (normalizedStatus == TableStatus.Dirty || normalizedStatus == TableStatus.Occupied)
+                return normalizedStatus;
+
+            if (table == null)
+                return TableStatus.Available;
+
+            try
+            {
+                var hasActiveReservation = _reservationController.HasActiveReservationForTable(table.Id, DateTime.Today, DateTime.Now.TimeOfDay);
+                return hasActiveReservation ? TableStatus.Occupied : normalizedStatus;
+            }
+            catch
+            {
+                return normalizedStatus;
+            }
         }
 
     }

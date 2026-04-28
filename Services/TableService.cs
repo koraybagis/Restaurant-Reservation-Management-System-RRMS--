@@ -10,7 +10,7 @@ namespace RestoranRezervasyonSistemi.Services
     public static class TableConstants
     {
         public const int WarningMinutesBeforeReservation = 30;
-        public const int ReservationDurationMinutes = 150;
+        public const int ReservationDurationMinutes = 120;
         public const int ButtonSize = 120;
         public const int ButtonFontSize = 10;
     }
@@ -32,45 +32,89 @@ namespace RestoranRezervasyonSistemi.Services
             var currentTime = DateTime.Now.TimeOfDay;
             var today = DateTime.Today;
 
-            return tables.Select(table => new TableButtonInfo(
-                table,
-                GetTableColor(table, currentTime),
-                GetTooltipText(table, today, currentTime)
-            )).ToList();
+            return tables.Select(table =>
+            {
+                var state = BuildVisualState(table, today, currentTime);
+                return new TableButtonInfo(
+                    table,
+                    state.Color,
+                    state.TooltipText,
+                    state.IsSelectable,
+                    state.ReservationWarningText
+                );
+            }).ToList();
         }
 
-        private Color GetTableColor(Table table, TimeSpan currentTime)
+        private TableVisualState BuildVisualState(Table table, DateTime today, TimeSpan currentTime)
         {
             var normalizedStatus = TableStatusService.Normalize(table.Status);
-            var baseColor = TableStatusService.GetColor(normalizedStatus);
+            var defaultColor = TableStatusService.GetColor(normalizedStatus);
+            var searchStart = currentTime.Add(TimeSpan.FromMinutes(-TableConstants.ReservationDurationMinutes));
+            if (searchStart < TimeSpan.Zero)
+                searchStart = TimeSpan.Zero;
 
-            if (normalizedStatus == TableStatus.Dirty || normalizedStatus == TableStatus.Occupied)
-                return baseColor;
+            // Finds either currently active reservation start time or the nearest upcoming one.
+            var nextReservation = _reservationController.GetNextReservationTime(table.Id, today, searchStart);
+            var tooltipText = GetTooltipText(table, today, currentTime, nextReservation);
 
-            if (table.ReservationTime == null)
-                return baseColor;
+            if (normalizedStatus == TableStatus.Dirty)
+            {
+                const string dirtyMessage = "Masa temizlik bekliyor, rezervasyon yapilamaz.";
+                var dirtyTooltip = $"{tooltipText}\n{dirtyMessage}";
+                return new TableVisualState(defaultColor, dirtyTooltip, false, dirtyMessage);
+            }
 
-            var reservationTime = (TimeSpan)table.ReservationTime;
+            if (normalizedStatus == TableStatus.Occupied)
+            {
+                return new TableVisualState(defaultColor, tooltipText, true, string.Empty);
+            }
+
+            if (!nextReservation.HasValue)
+            {
+                return new TableVisualState(defaultColor, tooltipText, true, string.Empty);
+            }
+
+            var reservationTime = nextReservation.Value;
             var warningTime = reservationTime.Add(TimeSpan.FromMinutes(-TableConstants.WarningMinutesBeforeReservation));
-            var endTime = reservationTime.Add(TimeSpan.FromMinutes(TableConstants.ReservationDurationMinutes));
+            var reservationEndTime = reservationTime.Add(TimeSpan.FromMinutes(TableConstants.ReservationDurationMinutes));
+            var warningText = $"En yakin rezervasyon saati: {reservationTime:hh\\:mm}";
 
-            return currentTime >= warningTime && currentTime <= endTime 
-                ? Color.Firebrick 
-                : baseColor;
+            if ((currentTime >= warningTime && currentTime < reservationTime) ||
+                (currentTime >= reservationTime && currentTime < reservationEndTime))
+            {
+                return new TableVisualState(Color.Firebrick, tooltipText, false, warningText);
+            }
+
+            return new TableVisualState(Color.DarkOrange, tooltipText, true, string.Empty);
         }
 
-        private string GetTooltipText(Table table, DateTime today, TimeSpan currentTime)
+        private string GetTooltipText(Table table, DateTime today, TimeSpan currentTime, TimeSpan? nextReservation)
         {
-            var next = _reservationController.GetNextReservationTime(table.Id, today, currentTime);
             var earliest = _reservationController.GetEarliestAvailableTime(table.Id, today, currentTime);
 
-            var nextText = next.HasValue ? next.Value.ToString(@"hh\:mm") : "Yok";
+            var nextText = nextReservation.HasValue ? nextReservation.Value.ToString(@"hh\:mm") : "Yok";
             var earliestText = earliest.ToString(@"hh\:mm");
 
             return $"{table.TableName}\nKonum: {table.Location}\nKapasite: {table.Capacity}\n" +
                    $"Sonraki rezervasyon: {nextText}\n" +
                    $"En erken uygun saat: {earliestText}\n" +
                    $"Oturma süresi: {(TableConstants.ReservationDurationMinutes / 60)} saat";
+        }
+
+        private sealed class TableVisualState
+        {
+            public Color Color { get; }
+            public string TooltipText { get; }
+            public bool IsSelectable { get; }
+            public string ReservationWarningText { get; }
+
+            public TableVisualState(Color color, string tooltipText, bool isSelectable, string reservationWarningText)
+            {
+                Color = color;
+                TooltipText = tooltipText;
+                IsSelectable = isSelectable;
+                ReservationWarningText = reservationWarningText;
+            }
         }
     }
 }

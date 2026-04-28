@@ -22,13 +22,16 @@ namespace RestoranRezervasyonSistemi.Controllers
             _reservations.DeleteReservationForUser(tableId, date, time, customerEmail, customerName);
 
         public bool ReservationExists(int tableId, DateTime date, TimeSpan time) =>
-            _reservations.ReservationExists(tableId, date, time);
+            _reservations.ReservationExists(tableId, date, NormalizeToMinute(time));
 
         public bool HasConflict(int tableId, DateTime date, TimeSpan time)
         {
-            // Business rule: each reservation occupies the table for 2.5 hours (150 minutes).
-            return _reservations.HasConflict(tableId, date, time, conflictWindowMinutes: 150);
+            // Business rule: each reservation occupies the table for 2 hours (120 minutes).
+            return _reservations.HasConflict(tableId, date, NormalizeToMinute(time), conflictWindowMinutes: 120);
         }
+
+        public bool HasActiveReservationForTable(int tableId, DateTime date, TimeSpan time) =>
+            _reservations.HasActiveReservationForTable(tableId, date, NormalizeToMinute(time), durationMinutes: 120);
 
         public List<Reservation> GetAllReservations()
         {
@@ -43,7 +46,7 @@ namespace RestoranRezervasyonSistemi.Controllers
                 CustomerName = customerName,
                 CustomerPhone = customerPhone,
                 ReservationDate = date.Date,
-                ReservationTime = time,
+                ReservationTime = NormalizeToMinute(time),
                 GuestCount = guestCount,
                 CustomerEmail = customerEmail
             };
@@ -52,19 +55,27 @@ namespace RestoranRezervasyonSistemi.Controllers
         }
 
         public (int ReservationId, TimeSpan ReservationTime)? GetNextReservationForUser(int tableId, DateTime date, string customerEmail, string customerName, TimeSpan? fromTime = null) =>
-            _reservations.GetNextReservationForUser(tableId, date, customerEmail, customerName, fromTime);
+            _reservations.GetNextReservationForUser(tableId, date, customerEmail, customerName, fromTime.HasValue ? NormalizeToMinute(fromTime.Value) : (TimeSpan?)null);
 
         public TimeSpan? GetNextReservationTime(int tableId, DateTime date, TimeSpan fromTime) =>
-            _reservations.GetNextReservationTime(tableId, date, fromTime);
+            _reservations.GetNextReservationTime(tableId, date, NormalizeToMinute(fromTime));
 
         public TimeSpan GetEarliestAvailableTime(int tableId, DateTime date, TimeSpan fromTime) =>
-            _reservations.GetEarliestAvailableTime(tableId, date, fromTime, durationMinutes: 150);
+            _reservations.GetEarliestAvailableTime(tableId, date, NormalizeToMinute(fromTime), durationMinutes: 120);
 
         public int EnsureOpenReservationForTable(int tableId) =>
             _reservations.EnsureOpenReservationForTable(tableId);
 
         public int? GetOpenReservationForTable(int tableId) =>
             _reservations.GetOpenReservationForTable(tableId);
+
+        public int? GetActiveReservationIdForTable(int tableId, DateTime date, TimeSpan time) =>
+            _reservations.GetActiveReservationIdForTable(tableId, date, NormalizeToMinute(time), durationMinutes: 120);
+
+        private static TimeSpan NormalizeToMinute(TimeSpan time)
+        {
+            return new TimeSpan(time.Hours, time.Minutes, 0);
+        }
     }
 }
 

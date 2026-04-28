@@ -131,14 +131,15 @@ namespace RestoranRezervasyonSistemi.Data
                 conn.Open();
                 const string sql = @"SELECT TOP 1 reservation_time
                                      FROM reservations
-                                     WHERE table_id=@tid AND reservation_date=@date AND reservation_time >= @from
+                                     WHERE table_id=@tid AND reservation_date=@date
+                                       AND reservation_time >= @fromTime
                                      ORDER BY reservation_time";
 
                 using (var cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@tid", tableId);
                     cmd.Parameters.AddWithValue("@date", date.Date);
-                    cmd.Parameters.AddWithValue("@from", fromTime);
+                    cmd.Parameters.AddWithValue("@fromTime", fromTime);
 
                     var value = cmd.ExecuteScalar();
                     if (value == null || value == DBNull.Value)
@@ -200,13 +201,43 @@ namespace RestoranRezervasyonSistemi.Data
             using (var conn = _db.GetConnection())
             {
                 conn.Open();
-                const string sql = "SELECT COUNT(*) FROM reservations WHERE table_id=@tid AND reservation_date=@date AND ABS(DATEDIFF(minute, reservation_time, @time)) < @window";
+                // Overlap rule:
+                // [newStart, newEnd) and [existingStart, existingEnd) overlap iff
+                // newStart < existingEnd AND newEnd > existingStart
+                const string sql = @"SELECT COUNT(*)
+                                     FROM reservations
+                                     WHERE table_id = @tid
+                                       AND reservation_date = @date
+                                       AND @time < DATEADD(minute, @window, reservation_time)
+                                       AND DATEADD(minute, @window, @time) > reservation_time";
                 using (var cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@tid", tableId);
                     cmd.Parameters.AddWithValue("@date", date.Date);
                     cmd.Parameters.AddWithValue("@time", time);
                     cmd.Parameters.AddWithValue("@window", conflictWindowMinutes);
+                    return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
+                }
+            }
+        }
+
+        public bool HasActiveReservationForTable(int tableId, DateTime date, TimeSpan time, int durationMinutes)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                const string sql = @"SELECT COUNT(1)
+                                     FROM reservations
+                                     WHERE table_id = @tid
+                                       AND reservation_date = @date
+                                       AND reservation_time <= @time
+                                       AND DATEADD(minute, @duration, reservation_time) > @time";
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@tid", tableId);
+                    cmd.Parameters.AddWithValue("@date", date.Date);
+                    cmd.Parameters.AddWithValue("@time", time);
+                    cmd.Parameters.AddWithValue("@duration", durationMinutes);
                     return Convert.ToInt32(cmd.ExecuteScalar()) > 0;
                 }
             }
@@ -328,6 +359,35 @@ namespace RestoranRezervasyonSistemi.Data
                 using (var cmd = new SqlCommand(sql, conn))
                 {
                     cmd.Parameters.AddWithValue("@tid", tableId);
+                    var id = cmd.ExecuteScalar();
+                    if (id == null || id == DBNull.Value)
+                        return null;
+
+                    return Convert.ToInt32(id);
+                }
+            }
+        }
+
+        public int? GetActiveReservationIdForTable(int tableId, DateTime date, TimeSpan time, int durationMinutes)
+        {
+            using (var conn = _db.GetConnection())
+            {
+                conn.Open();
+                const string sql = @"SELECT TOP 1 id
+                                     FROM reservations
+                                     WHERE table_id = @tid
+                                       AND reservation_date = @date
+                                       AND reservation_time <= @time
+                                       AND DATEADD(minute, @duration, reservation_time) > @time
+                                     ORDER BY reservation_time DESC, id DESC";
+
+                using (var cmd = new SqlCommand(sql, conn))
+                {
+                    cmd.Parameters.AddWithValue("@tid", tableId);
+                    cmd.Parameters.AddWithValue("@date", date.Date);
+                    cmd.Parameters.AddWithValue("@time", time);
+                    cmd.Parameters.AddWithValue("@duration", durationMinutes);
+
                     var id = cmd.ExecuteScalar();
                     if (id == null || id == DBNull.Value)
                         return null;

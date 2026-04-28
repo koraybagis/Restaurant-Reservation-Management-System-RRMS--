@@ -34,7 +34,7 @@ namespace RestoranRezervasyonSistemi.Views
             this.btnGarsonGiris.ForeColor = System.Drawing.Color.White;
             this.btnGarsonGiris.Location = new System.Drawing.Point(50, 180);
             this.btnGarsonGiris.Name = "btnGarsonGiris";
-            this.btnGarsonGiris.Size = new System.Drawing.Size(150, 45);
+            this.btnGarsonGiris.Size = new System.Drawing.Size(150, 64);
             this.btnGarsonGiris.TabIndex = 5;
             this.btnGarsonGiris.Text = "🍽️ Garson Girişi";
             this.btnGarsonGiris.UseVisualStyleBackColor = false;
@@ -47,7 +47,7 @@ namespace RestoranRezervasyonSistemi.Views
             this.btnTemizlikGiris.ForeColor = System.Drawing.Color.White;
             this.btnTemizlikGiris.Location = new System.Drawing.Point(220, 180);
             this.btnTemizlikGiris.Name = "btnTemizlikGiris";
-            this.btnTemizlikGiris.Size = new System.Drawing.Size(150, 45);
+            this.btnTemizlikGiris.Size = new System.Drawing.Size(150, 64);
             this.btnTemizlikGiris.TabIndex = 6;
             this.btnTemizlikGiris.Text = "🧹 Temizlik Girişi";
             this.btnTemizlikGiris.UseVisualStyleBackColor = false;

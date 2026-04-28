@@ -15,11 +15,13 @@ namespace RestoranRezervasyonSistemi.Views
         public User CurrentUser { get; set; }
 
         private readonly TableController _tableController;
+        private readonly TableService _tableService;
         private readonly ToolTip _toolTip;
 
         public MainForm()
         {
             _tableController = new TableController();
+            _tableService = new TableService(_tableController, new ReservationController());
             _toolTip = CreateToolTip();
             InitializeComponent();
         }
@@ -121,22 +123,18 @@ namespace RestoranRezervasyonSistemi.Views
                 flpMasalar.Controls.Clear();
 
                 var tables = _tableController.GetAllTables();
+                var hasFallbackTables = false;
                 
                 if (tables == null || tables.Count == 0)
                 {
                     MessageBox.Show("Veritabanında masa bulunamadı. Geçici olarak dummy masalar gösteriliyor.\n\nLütfen Admin Panelinden masalar ekleyin.", "Uyarı", MessageBoxButtons.OK, MessageBoxIcon.Warning);
                     tables = CreateFallbackTables();
+                    hasFallbackTables = true;
                 }
 
-                var tableButtonInfos = new List<TableButtonInfo>();
-
-                foreach (var table in tables)
-                {
-                    var buttonColor = GetTableButtonColor(table);
-                    var tooltipText = GetTableTooltipText(table);
-                    
-                    tableButtonInfos.Add(new TableButtonInfo(table, buttonColor, tooltipText));
-                }
+                var tableButtonInfos = hasFallbackTables
+                    ? tables.ConvertAll(table => new TableButtonInfo(table, GetTableButtonColor(table), GetTableTooltipText(table), true, string.Empty))
+                    : _tableService.GetTableButtonInfos();
 
                 foreach (var tableInfo in tableButtonInfos)
                 {
@@ -170,7 +168,7 @@ namespace RestoranRezervasyonSistemi.Views
             {
                 var buttonColor = GetTableButtonColor(table);
                 var tooltipText = GetTableTooltipText(table);
-                var tableInfo = new TableButtonInfo(table, buttonColor, tooltipText);
+                var tableInfo = new TableButtonInfo(table, buttonColor, tooltipText, true, string.Empty);
                 var button = CreateTableButton(tableInfo);
                 flpMasalar.Controls.Add(button);
             }
@@ -203,7 +201,7 @@ namespace RestoranRezervasyonSistemi.Views
             };
 
             _toolTip.SetToolTip(button, tableInfo.TooltipText);
-            button.Click += (s, ev) => HandleTableClick(table);
+            button.Click += (s, ev) => HandleTableClick(tableInfo);
 
             return button;
         }
@@ -224,17 +222,29 @@ namespace RestoranRezervasyonSistemi.Views
             return $"{table.TableName}\nKonum: {table.Location}\nKapasite: {table.Capacity}\nDurum: {table.Status}";
         }
 
-        private void HandleTableClick(Table table)
+        private void HandleTableClick(TableButtonInfo tableInfo)
         {
             try
             {
-                // Null kontrolleri
-                if (table == null)
+                if (tableInfo == null || tableInfo.Table == null)
                 {
                     MessageBox.Show("Masa bilgisi bulunamadı.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;
                 }
 
+                if (!tableInfo.IsSelectable)
+                {
+                    var message = string.IsNullOrWhiteSpace(tableInfo.ReservationWarningText)
+                        ? "Bu masa su anda secilemez."
+                        : $"Bu masa su anda secilemez.\n{tableInfo.ReservationWarningText}";
+
+                    MessageBox.Show(message, "Rezervasyon Uyarisi", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                    return;
+                }
+
+                var table = tableInfo.Table;
+
+                // Null kontrolleri
                 if (string.IsNullOrEmpty(this.AktifKullaniciMail))
                 {
                     MessageBox.Show("Kullanıcı mail adresi bulunamadı. Lütfen tekrar giriş yapın.", "Hata", MessageBoxButtons.OK, MessageBoxIcon.Error);
